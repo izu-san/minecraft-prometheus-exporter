@@ -21,7 +21,21 @@ repositories {
 }
 
 base {
-    archivesName = mod_id
+    archivesName = "${mod_id}-NeoForge-mc${minecraft_version}-${mod_version}"
+}
+
+// jarJarタスクのファイル名を指定した形式に設定
+tasks.named('jarJar', Jar).configure {
+    archiveBaseName.set("${mod_id}-NeoForge-mc${minecraft_version}")
+    archiveVersion.set("${mod_version}")
+    archiveClassifier.set("")  // -allサフィックスを削除
+}
+
+// 通常のjarタスクのファイル名を変更（jarJarタスクと区別するため）
+tasks.named('jar', Jar).configure {
+    archiveBaseName.set("${mod_id}-NeoForge-mc${minecraft_version}")
+    archiveVersion.set("${mod_version}")
+    archiveClassifier.set("dev")  // 開発用として-devサフィックスを付ける
 }
 
 // Mojang ships Java 21 to end users in 1.21, so mods should target Java 21.
@@ -95,6 +109,20 @@ dependencies {
     // And its provides the option to then use net.minecraft as the group, and one of; client, server or joined as the module name, plus the game version as version.
     // For all intends and purposes: You can treat this dependency as if it is a normal library you would use.
     implementation "net.neoforged:neoforge:${neo_version}"
+    
+    // Prometheus Java Client - jarJarでJARに含める
+    implementation "io.prometheus:simpleclient:0.16.0"
+    jarJar(group: "io.prometheus", name: "simpleclient", version: "[0.16.0,0.17.0)")
+    
+    implementation "io.prometheus:simpleclient_common:0.16.0"
+    jarJar(group: "io.prometheus", name: "simpleclient_common", version: "[0.16.0,0.17.0)")
+    
+    implementation "io.prometheus:simpleclient_httpserver:0.16.0"
+    jarJar(group: "io.prometheus", name: "simpleclient_httpserver", version: "[0.16.0,0.17.0)")
+    
+    // SnakeYAML for configuration file parsing - jarJarでJARに含める
+    implementation "org.yaml:snakeyaml:2.2"
+    jarJar(group: "org.yaml", name: "snakeyaml", version: "[2.2,2.3)")
 
     // Example optional mod dependency with JEI
     // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
