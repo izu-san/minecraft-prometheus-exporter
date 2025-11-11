@@ -9,7 +9,9 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.Level;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class PlayerMetrics {
     private final Gauge playersOnlineGauge;
@@ -18,6 +20,8 @@ public class PlayerMetrics {
     private final Counter playerLeaveCounter;
     private final Gauge playerPingGauge;
     private final Gauge playerDimensionCountGauge;
+    private final Set<String> trackedPlayers = new HashSet<>();
+    private final Set<String> trackedDimensions = new HashSet<>();
     
     public PlayerMetrics(CollectorRegistry registry) {
         playersOnlineGauge = Gauge.build()
@@ -64,25 +68,54 @@ public class PlayerMetrics {
         playersOnlineGauge.set(onlineCount);
         playersMaxGauge.set(maxPlayers);
         
+        // Collect currently online player names
+        Set<String> currentOnlinePlayers = new HashSet<>();
+        
         // Ping value per player
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
+            String playerName = player.getGameProfile().getName();
             int ping = player.connection.latency();
-            playerPingGauge.labels(player.getGameProfile().getName()).set(ping);
+            playerPingGauge.labels(playerName).set(ping);
+            currentOnlinePlayers.add(playerName);
         }
+        
+        // Reset ping to 0 for players who are no longer online
+        for (String playerName : trackedPlayers) {
+            if (!currentOnlinePlayers.contains(playerName)) {
+                playerPingGauge.labels(playerName).set(0);
+            }
+        }
+        
+        // Update tracked players set
+        trackedPlayers.clear();
+        trackedPlayers.addAll(currentOnlinePlayers);
         
         // Number of players per dimension
         Map<ResourceKey<Level>, Integer> dimensionCounts = new HashMap<>();
+        Set<String> currentDimensions = new HashSet<>();
         for (ServerPlayer player : server.getPlayerList().getPlayers()) {
             ResourceKey<Level> dimension = player.level().dimension();
+            String dimensionName = dimension.location().toString();
             dimensionCounts.put(dimension, dimensionCounts.getOrDefault(dimension, 0) + 1);
+            currentDimensions.add(dimensionName);
         }
         
-        // Clear existing labels before setting new values
-        // Note: Prometheus Gauge is independent per label,
-        // so old label values need to be reset to 0
+        // Set current dimension counts
         for (Map.Entry<ResourceKey<Level>, Integer> entry : dimensionCounts.entrySet()) {
-            playerDimensionCountGauge.labels(entry.getKey().location().toString()).set(entry.getValue());
+            String dimensionName = entry.getKey().location().toString();
+            playerDimensionCountGauge.labels(dimensionName).set(entry.getValue());
         }
+        
+        // Reset dimensions that no longer have any players to 0
+        for (String dimensionName : trackedDimensions) {
+            if (!currentDimensions.contains(dimensionName)) {
+                playerDimensionCountGauge.labels(dimensionName).set(0);
+            }
+        }
+        
+        // Update tracked dimensions set
+        trackedDimensions.clear();
+        trackedDimensions.addAll(currentDimensions);
     }
     
     public void onPlayerJoin() {
