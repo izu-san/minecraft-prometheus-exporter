@@ -33,6 +33,7 @@ public class MetricsManager {
     private EntityTypeMetrics entityTypeMetrics;
     private ChunkMetrics chunkMetrics;
     private ErrorMetrics errorMetrics;
+    private ModMetrics modMetrics;
     
     public MetricsManager() {
         registry = CollectorRegistry.defaultRegistry;
@@ -45,6 +46,7 @@ public class MetricsManager {
         entityTypeMetrics = new EntityTypeMetrics(registry);
         chunkMetrics = new ChunkMetrics(registry);
         errorMetrics = new ErrorMetrics(registry);
+        modMetrics = new ModMetrics(registry);
     }
     
     public void onServerStarting(ServerStartingEvent event) {
@@ -69,6 +71,7 @@ public class MetricsManager {
         // Initialize metrics on server startup
         serverMetrics.initialize(server);
         resourceMetrics.initialize();
+        modMetrics.refresh();
         
         // Register WorldMetrics event listeners
         NeoForge.EVENT_BUS.addListener(worldMetrics::onLevelTickStart);
