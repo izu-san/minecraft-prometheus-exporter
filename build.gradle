@@ -152,6 +152,9 @@ dependencies {
 // When "copyIdeResources" is enabled, this will also run before the game launches in IDE environments.
 // See https://docs.gradle.org/current/dsl/org.gradle.language.jvm.tasks.ProcessResources.html
 tasks.withType(ProcessResources).configureEach {
+    // Explicitly set UTF-8 encoding for resource files to prevent encoding issues
+    filteringCharset = 'UTF-8'
+    
     var replaceProperties = [
             minecraft_version      : minecraft_version,
             minecraft_version_range: minecraft_version_range,
@@ -187,6 +190,19 @@ publishing {
 
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
+}
+
+// Ensure JAR tasks use UTF-8 encoding for manifest and file entries
+tasks.withType(Jar).configureEach {
+    manifest {
+        attributes(
+            'Implementation-Title': project.name,
+            'Implementation-Version': project.version
+        )
+    }
+    // Ensure files are stored with UTF-8 encoding
+    preserveFileTimestamps = false
+    reproducibleFileOrder = true
 }
 
 // IDEA no longer automatically downloads sources/javadoc jars for dependencies, so we need to explicitly enable the behavior.

@@ -19,6 +19,7 @@ public class ExporterConfig {
     private static String bindAddress = "0.0.0.0";
     private static int port = 9225;
     private static boolean enabled = true;
+    private static int mekanismMetricsUpdateInterval = 20; // Update every 20 ticks (default: 1 time per second)
     
     public static void init() {
         Path configPath = FMLPaths.CONFIGDIR.get().resolve(CONFIG_FILE);
@@ -44,6 +45,12 @@ public class ExporterConfig {
                 port: 9225
                 # Enable exporter (true/false)
                 enabled: true
+                # Mekanism metrics update interval in ticks (default: 20)
+                # Lower values = more frequent updates but higher server load
+                # Higher values = less frequent updates but lower server load
+                # Recommended: 10-40 ticks (2-0.5 times per second)
+                # Default: 20 ticks = 1 update per second
+                mekanismMetricsUpdateInterval: 20
                 """;
             
             Files.writeString(configPath, defaultConfig, StandardCharsets.UTF_8);
@@ -90,7 +97,20 @@ public class ExporterConfig {
                 }
             }
             
-            LOGGER.info("Configuration loaded - Bind address: {}, Port: {}, Enabled: {}", bindAddress, port, enabled);
+            // Load Mekanism metrics update interval
+            Object intervalObj = config.get("mekanismMetricsUpdateInterval");
+            if (intervalObj != null) {
+                if (intervalObj instanceof Integer) {
+                    mekanismMetricsUpdateInterval = Math.max(1, (Integer) intervalObj);
+                } else if (intervalObj instanceof String) {
+                    mekanismMetricsUpdateInterval = Math.max(1, Integer.parseInt((String) intervalObj));
+                } else if (intervalObj instanceof Number) {
+                    mekanismMetricsUpdateInterval = Math.max(1, ((Number) intervalObj).intValue());
+                }
+            }
+            
+            LOGGER.info("Configuration loaded - Bind address: {}, Port: {}, Enabled: {}, Mekanism update interval: {} ticks", 
+                bindAddress, port, enabled, mekanismMetricsUpdateInterval);
         } catch (IOException e) {
             LOGGER.error("Failed to load configuration file", e);
         } catch (Exception e) {
@@ -108,6 +128,10 @@ public class ExporterConfig {
     
     public static boolean isEnabled() {
         return enabled;
+    }
+    
+    public static int getMekanismMetricsUpdateInterval() {
+        return mekanismMetricsUpdateInterval;
     }
 }
 

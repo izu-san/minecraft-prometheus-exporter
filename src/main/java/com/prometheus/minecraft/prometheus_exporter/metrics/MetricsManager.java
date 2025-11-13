@@ -34,6 +34,7 @@ public class MetricsManager {
     private ChunkMetrics chunkMetrics;
     private ErrorMetrics errorMetrics;
     private ModMetrics modMetrics;
+    private MekanismMetrics mekanismMetrics;
     
     public MetricsManager() {
         registry = CollectorRegistry.defaultRegistry;
@@ -47,6 +48,7 @@ public class MetricsManager {
         chunkMetrics = new ChunkMetrics(registry);
         errorMetrics = new ErrorMetrics(registry);
         modMetrics = new ModMetrics(registry);
+        mekanismMetrics = new MekanismMetrics(registry);
     }
     
     public void onServerStarting(ServerStartingEvent event) {
@@ -113,6 +115,9 @@ public class MetricsManager {
         
         // Update entity type metrics
         entityTypeMetrics.update(server);
+        
+        // Update Mekanism metrics
+        mekanismMetrics.update(server);
         
         // Record tick processing time
         long tickDuration = System.currentTimeMillis() - tickStartTime;
