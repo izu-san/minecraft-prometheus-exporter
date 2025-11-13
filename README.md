@@ -131,7 +131,9 @@ These metrics require Mekanism and MekanismGenerators mods to be installed. Metr
 |------------|------|-------------|--------|
 | `mekanism_fission_reactor_burn_rate_mb_per_tick` | Gauge | Fission reactor burn rate in mB/tick (actual burn rate) | `dimension`, `x`, `y`, `z` |
 | `mekanism_fission_reactor_coolant_capacity_mb` | Gauge | Fission reactor coolant capacity in mB | `dimension`, `x`, `y`, `z` |
+| `mekanism_fission_reactor_coolant_stored_mb` | Gauge | Fission reactor coolant stored amount in mB | `dimension`, `x`, `y`, `z` |
 | `mekanism_fission_reactor_fuel_capacity_mb` | Gauge | Fission reactor fuel capacity in mB | `dimension`, `x`, `y`, `z` |
+| `mekanism_fission_reactor_fuel_stored_mb` | Gauge | Fission reactor fuel stored amount in mB | `dimension`, `x`, `y`, `z` |
 
 ### Fusion Reactor Metrics
 
@@ -139,9 +141,13 @@ These metrics require Mekanism and MekanismGenerators mods to be installed. Metr
 |------------|------|-------------|--------|
 | `mekanism_fusion_reactor_injection_rate_mb_per_tick` | Gauge | Fusion reactor injection rate in mB/tick | `dimension`, `x`, `y`, `z` |
 | `mekanism_fusion_reactor_coolant_capacity_mb` | Gauge | Fusion reactor coolant (water) capacity in mB | `dimension`, `x`, `y`, `z` |
+| `mekanism_fusion_reactor_coolant_stored_mb` | Gauge | Fusion reactor coolant (water) stored amount in mB | `dimension`, `x`, `y`, `z` |
 | `mekanism_fusion_reactor_deuterium_capacity_mb` | Gauge | Fusion reactor deuterium fuel capacity in mB | `dimension`, `x`, `y`, `z` |
+| `mekanism_fusion_reactor_deuterium_stored_mb` | Gauge | Fusion reactor deuterium fuel stored amount in mB | `dimension`, `x`, `y`, `z` |
 | `mekanism_fusion_reactor_tritium_capacity_mb` | Gauge | Fusion reactor tritium fuel capacity in mB | `dimension`, `x`, `y`, `z` |
+| `mekanism_fusion_reactor_tritium_stored_mb` | Gauge | Fusion reactor tritium fuel stored amount in mB | `dimension`, `x`, `y`, `z` |
 | `mekanism_fusion_reactor_fuel_capacity_mb` | Gauge | Fusion reactor fusion fuel (DT Fuel) capacity in mB | `dimension`, `x`, `y`, `z` |
+| `mekanism_fusion_reactor_fuel_stored_mb` | Gauge | Fusion reactor fusion fuel (DT Fuel) stored amount in mB | `dimension`, `x`, `y`, `z` |
 
 ### Industrial Turbine Metrics
 

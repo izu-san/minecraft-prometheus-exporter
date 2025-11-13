@@ -36,13 +36,19 @@ public class MekanismMetrics {
     
     private final Gauge fissionReactorBurnRateGauge;
     private final Gauge fissionReactorCoolantCapacityGauge;
+    private final Gauge fissionReactorCoolantStoredGauge;
     private final Gauge fissionReactorFuelCapacityGauge;
+    private final Gauge fissionReactorFuelStoredGauge;
     
     private final Gauge fusionReactorInjectionRateGauge;
     private final Gauge fusionReactorCoolantCapacityGauge;
     private final Gauge fusionReactorDeuteriumCapacityGauge;
     private final Gauge fusionReactorTritiumCapacityGauge;
     private final Gauge fusionReactorFuelCapacityGauge;
+    private final Gauge fusionReactorCoolantStoredGauge;
+    private final Gauge fusionReactorDeuteriumStoredGauge;
+    private final Gauge fusionReactorTritiumStoredGauge;
+    private final Gauge fusionReactorFuelStoredGauge;
     
     private final Gauge turbinePowerGenerationGauge;
     
@@ -62,7 +68,7 @@ public class MekanismMetrics {
     private Method getBurnRateMethod;
     private Method getActualBurnRateMethod;
     private Method getCoolantCapacityMethod;
-    private Method getFuelCapacityMethod;
+    private Method getCoolantTankMethod;
     private Method getFuelTankMethod;
     private Method getFuelTankCapacityMethod;
     
@@ -121,9 +127,21 @@ public class MekanismMetrics {
             .labelNames("dimension", "x", "y", "z")
             .register(registry);
         
+        fissionReactorCoolantStoredGauge = Gauge.build()
+            .name("mekanism_fission_reactor_coolant_stored_mb")
+            .help("Fission reactor coolant stored amount in mB")
+            .labelNames("dimension", "x", "y", "z")
+            .register(registry);
+        
         fissionReactorFuelCapacityGauge = Gauge.build()
             .name("mekanism_fission_reactor_fuel_capacity_mb")
             .help("Fission reactor fuel capacity in mB")
+            .labelNames("dimension", "x", "y", "z")
+            .register(registry);
+        
+        fissionReactorFuelStoredGauge = Gauge.build()
+            .name("mekanism_fission_reactor_fuel_stored_mb")
+            .help("Fission reactor fuel stored amount in mB")
             .labelNames("dimension", "x", "y", "z")
             .register(registry);
         
@@ -139,9 +157,21 @@ public class MekanismMetrics {
             .labelNames("dimension", "x", "y", "z")
             .register(registry);
         
+        fusionReactorCoolantStoredGauge = Gauge.build()
+            .name("mekanism_fusion_reactor_coolant_stored_mb")
+            .help("Fusion reactor coolant (water) stored amount in mB")
+            .labelNames("dimension", "x", "y", "z")
+            .register(registry);
+        
         fusionReactorDeuteriumCapacityGauge = Gauge.build()
             .name("mekanism_fusion_reactor_deuterium_capacity_mb")
             .help("Fusion reactor deuterium fuel capacity in mB")
+            .labelNames("dimension", "x", "y", "z")
+            .register(registry);
+        
+        fusionReactorDeuteriumStoredGauge = Gauge.build()
+            .name("mekanism_fusion_reactor_deuterium_stored_mb")
+            .help("Fusion reactor deuterium fuel stored amount in mB")
             .labelNames("dimension", "x", "y", "z")
             .register(registry);
         
@@ -151,9 +181,21 @@ public class MekanismMetrics {
             .labelNames("dimension", "x", "y", "z")
             .register(registry);
         
+        fusionReactorTritiumStoredGauge = Gauge.build()
+            .name("mekanism_fusion_reactor_tritium_stored_mb")
+            .help("Fusion reactor tritium fuel stored amount in mB")
+            .labelNames("dimension", "x", "y", "z")
+            .register(registry);
+        
         fusionReactorFuelCapacityGauge = Gauge.build()
             .name("mekanism_fusion_reactor_fuel_capacity_mb")
             .help("Fusion reactor fusion fuel (DT Fuel) capacity in mB")
+            .labelNames("dimension", "x", "y", "z")
+            .register(registry);
+        
+        fusionReactorFuelStoredGauge = Gauge.build()
+            .name("mekanism_fusion_reactor_fuel_stored_mb")
+            .help("Fusion reactor fusion fuel (DT Fuel) stored amount in mB")
             .labelNames("dimension", "x", "y", "z")
             .register(registry);
         
@@ -267,8 +309,10 @@ public class MekanismMetrics {
             try {
                 // First try: getCoolantCapacity() method (public method)
                 getCoolantCapacityMethod = fissionReactorMultiblockDataClass.getMethod("getCoolantCapacity");
+                getCoolantTankMethod = null;
                 LOGGER.info("✓ Found getCoolantCapacity() method - will use direct method call");
             } catch (NoSuchMethodException e) {
+                getCoolantCapacityMethod = null;
                 // Log available methods for debugging
                 LOGGER.info("✗ getCoolantCapacity() not found. Searching for alternative methods...");
                 try {
@@ -288,10 +332,8 @@ public class MekanismMetrics {
                 
                 // Second try: getCoolantTank() and then get capacity from tank
                 try {
-                    Method getCoolantTankMethod = fissionReactorMultiblockDataClass.getMethod("getCoolantTank");
-                    // Store the tank getter - we'll use it in updateFissionReactorMetrics to get the tank, then getCapacity
-                    getCoolantCapacityMethod = getCoolantTankMethod;
-                    LOGGER.info("✓ Found getCoolantTank() method - will get capacity from tank object");
+                    getCoolantTankMethod = fissionReactorMultiblockDataClass.getMethod("getCoolantTank");
+                    LOGGER.info("✓ Found getCoolantTank() method - will use tank object for capacity and stored amount");
                 } catch (NoSuchMethodException ex) {
                     // Third try: getCoolant() method (returns Either<ChemicalStack, FluidStack>)
                     try {
@@ -299,7 +341,7 @@ public class MekanismMetrics {
                         // This returns Either, but we can't easily get capacity from it
                         // So we'll try to access the coolantTank field directly
                         LOGGER.info("✓ Found getCoolant() method (returns Either) - will try to access coolantTank field");
-                        getCoolantCapacityMethod = null; // We'll use field access instead
+                        getCoolantTankMethod = null; // We'll rely on field access below
                     } catch (NoSuchMethodException ex2) {
                         // Fourth try: field access - access coolantTank field and get capacity from it
                         boolean found = false;
@@ -307,8 +349,8 @@ public class MekanismMetrics {
                             // Try to access the coolantTank field (public final MergedTank)
                             java.lang.reflect.Field coolantTankField = fissionReactorMultiblockDataClass.getField("coolantTank");
                             coolantTankField.setAccessible(true);
-                            getCoolantCapacityMethod = null; // We'll use field access
-                            LOGGER.info("✓ Found coolantTank field (public) - will get capacity from MergedTank");
+                            getCoolantTankMethod = null; // We'll use field access
+                            LOGGER.info("✓ Found coolantTank field (public) - will get values from MergedTank via field access");
                             found = true;
                         } catch (NoSuchFieldException fieldEx) {
                             // Try alternative field names
@@ -317,7 +359,7 @@ public class MekanismMetrics {
                                 try {
                                     java.lang.reflect.Field field = fissionReactorMultiblockDataClass.getDeclaredField(fieldName);
                                     field.setAccessible(true);
-                                    getCoolantCapacityMethod = null; // We'll use field access
+                                    getCoolantTankMethod = null; // We'll use field access
                                     LOGGER.info("✓ Found {} field (private) - will use field access", fieldName);
                                     found = true;
                                     break;
@@ -327,7 +369,7 @@ public class MekanismMetrics {
                         }
                         if (!found) {
                             LOGGER.warn("✗ Could not find any coolant capacity method or field - coolant metrics will be disabled");
-                            getCoolantCapacityMethod = null;
+                            getCoolantTankMethod = null;
                         }
                     }
                 }
@@ -512,13 +554,19 @@ public class MekanismMetrics {
 
         fissionReactorBurnRateGauge.clear();
         fissionReactorCoolantCapacityGauge.clear();
+        fissionReactorCoolantStoredGauge.clear();
         fissionReactorFuelCapacityGauge.clear();
+        fissionReactorFuelStoredGauge.clear();
 
         fusionReactorInjectionRateGauge.clear();
         fusionReactorCoolantCapacityGauge.clear();
+        fusionReactorCoolantStoredGauge.clear();
         fusionReactorDeuteriumCapacityGauge.clear();
+        fusionReactorDeuteriumStoredGauge.clear();
         fusionReactorTritiumCapacityGauge.clear();
+        fusionReactorTritiumStoredGauge.clear();
         fusionReactorFuelCapacityGauge.clear();
+        fusionReactorFuelStoredGauge.clear();
 
         turbinePowerGenerationGauge.clear();
 
@@ -901,6 +949,117 @@ public class MekanismMetrics {
         return null;
     }
 
+    private Double extractTankStored(Object tankObj) {
+        return extractTankStored(tankObj, 0);
+    }
+
+    private Double extractTankStored(Object tankObj, int depth) {
+        if (depth > 5) {
+            return null;
+        }
+        Object actual = unwrapDynamicValue(tankObj);
+        if (actual == null) {
+            return null;
+        }
+
+        String[] methodCandidates = {"getStoredAmount", "getStored", "getAmount", "getFluidAmount", "getChemicalAmount", "getContents", "getCurrentAmount", "getFilled"};
+        for (String methodName : methodCandidates) {
+            try {
+                Method method = actual.getClass().getMethod(methodName);
+                Object result = method.invoke(actual);
+                if (result instanceof Number number) {
+                    return number.doubleValue();
+                }
+                Double stackAmount = extractStackAmount(result);
+                if (stackAmount != null) {
+                    return stackAmount;
+                }
+            } catch (NoSuchMethodException ignored) {
+            } catch (Exception e) {
+                LOGGER.debug("Failed to invoke {} on {}: {}", methodName, actual.getClass().getName(), e.getMessage());
+            }
+        }
+
+        String[] fieldCandidates = {"stored", "storedAmount", "amount", "fluidAmount", "chemicalAmount", "contents", "value", "current"};
+        for (String fieldName : fieldCandidates) {
+            try {
+                java.lang.reflect.Field field = actual.getClass().getDeclaredField(fieldName);
+                field.setAccessible(true);
+                Object value = field.get(actual);
+                if (value instanceof Number number) {
+                    return number.doubleValue();
+                }
+                Double stackAmount = extractStackAmount(value);
+                if (stackAmount != null) {
+                    return stackAmount;
+                }
+            } catch (NoSuchFieldException ignored) {
+            } catch (Exception e) {
+                LOGGER.debug("Failed to access field {} on {}: {}", fieldName, actual.getClass().getName(), e.getMessage());
+            }
+        }
+
+        String[] nestedTankAccessors = {"getChemicalTank", "getFluidTank", "getGasTank", "getTank", "getInternalTank"};
+        for (String accessor : nestedTankAccessors) {
+            try {
+                Method nestedMethod = actual.getClass().getMethod(accessor);
+                Object nestedTank = nestedMethod.invoke(actual);
+                if (nestedTank != actual) {
+                    Double stored = extractTankStored(nestedTank, depth + 1);
+                    if (stored != null) {
+                        return stored;
+                    }
+                }
+            } catch (NoSuchMethodException ignored) {
+            } catch (Exception e) {
+                LOGGER.debug("Failed to invoke nested tank accessor {} on {} for stored amount: {}", accessor, actual.getClass().getName(), e.getMessage());
+            }
+        }
+
+        return null;
+    }
+
+    private Double extractStackAmount(Object stackObj) {
+        Object actual = unwrapDynamicValue(stackObj);
+        if (actual == null) {
+            return null;
+        }
+        if (actual instanceof Number number) {
+            return number.doubleValue();
+        }
+
+        String[] methodCandidates = {"getAmount", "getStored", "getFluidAmount", "getChemicalAmount", "getValue"};
+        for (String methodName : methodCandidates) {
+            try {
+                Method method = actual.getClass().getMethod(methodName);
+                Object result = method.invoke(actual);
+                if (result instanceof Number number) {
+                    return number.doubleValue();
+                }
+            } catch (NoSuchMethodException ignored) {
+            } catch (Exception e) {
+                LOGGER.debug("Failed to invoke {} on stack {}: {}", methodName, actual.getClass().getName(), e.getMessage());
+            }
+        }
+
+        String[] fieldCandidates = {"amount", "stored", "value"};
+        for (String fieldName : fieldCandidates) {
+            try {
+                java.lang.reflect.Field field = actual.getClass().getDeclaredField(fieldName);
+                field.setAccessible(true);
+                Object value = field.get(actual);
+                if (value instanceof Number number) {
+                    return number.doubleValue();
+                }
+            } catch (NoSuchFieldException ignored) {
+            } catch (Exception e) {
+                LOGGER.debug("Failed to access field {} on stack {}: {}", fieldName, actual.getClass().getName(), e.getMessage());
+            }
+        }
+
+        return null;
+    }
+
     private Double resolveNumericField(Object target, Class<?> ownerClass, String... fieldNames) {
         for (String fieldName : fieldNames) {
             try {
@@ -931,6 +1090,24 @@ public class MekanismMetrics {
             } catch (NoSuchFieldException ignored) {
             } catch (Exception e) {
                 LOGGER.debug("Failed to access tank field {} on {}: {}", fieldName, ownerClass.getName(), e.getMessage());
+            }
+        }
+        return null;
+    }
+
+    private Double resolveTankStoredFromFields(Object target, Class<?> ownerClass, String... fieldNames) {
+        for (String fieldName : fieldNames) {
+            try {
+                java.lang.reflect.Field field = ownerClass.getDeclaredField(fieldName);
+                field.setAccessible(true);
+                Object tankObj = field.get(target);
+                Double stored = extractTankStored(tankObj);
+                if (stored != null) {
+                    return stored;
+                }
+            } catch (NoSuchFieldException ignored) {
+            } catch (Exception e) {
+                LOGGER.debug("Failed to access tank field {} on {} for stored amount: {}", fieldName, ownerClass.getName(), e.getMessage());
             }
         }
         return null;
@@ -982,6 +1159,18 @@ public class MekanismMetrics {
             LOGGER.debug("Failed to invoke coolant capacity method: {}", e.getMessage());
         }
 
+        if (getCoolantTankMethod != null) {
+            try {
+                Object tankObj = getCoolantTankMethod.invoke(multiblockData);
+                Double capacity = extractTankCapacity(tankObj, null);
+                if (capacity != null) {
+                    return capacity;
+                }
+            } catch (Exception e) {
+                LOGGER.debug("Failed to invoke coolant tank method for capacity: {}", e.getMessage());
+            }
+        }
+
         Double viaTankField = resolveTankCapacityFromFields(multiblockData, fissionReactorMultiblockDataClass, null, "coolantTank");
         if (viaTankField != null) {
             return viaTankField;
@@ -1013,6 +1202,50 @@ public class MekanismMetrics {
         return resolveNumericField(multiblockData, fissionReactorMultiblockDataClass,
             "fuelCapacity", "maxFuel", "fuelTankCapacity");
     }
+
+    private Double resolveFissionCoolantStored(Object multiblockData) {
+        if (getCoolantTankMethod != null) {
+            try {
+                Object tankObj = getCoolantTankMethod.invoke(multiblockData);
+                Double stored = extractTankStored(tankObj);
+                if (stored != null) {
+                    return stored;
+                }
+            } catch (Exception e) {
+                LOGGER.debug("Failed to invoke coolant tank method for stored amount: {}", e.getMessage());
+            }
+        }
+
+        Double viaTankField = resolveTankStoredFromFields(multiblockData, fissionReactorMultiblockDataClass, "coolantTank");
+        if (viaTankField != null) {
+            return viaTankField;
+        }
+
+        return resolveNumericField(multiblockData, fissionReactorMultiblockDataClass,
+            "coolant", "currentCoolant", "cooledCoolant");
+    }
+
+    private Double resolveFissionFuelStored(Object multiblockData) {
+        if (getFuelTankMethod != null) {
+            try {
+                Object tankObj = getFuelTankMethod.invoke(multiblockData);
+                Double stored = extractTankStored(tankObj);
+                if (stored != null) {
+                    return stored;
+                }
+            } catch (Exception e) {
+                LOGGER.debug("Failed to invoke fuel tank method for stored amount: {}", e.getMessage());
+            }
+        }
+
+        Double viaTankField = resolveTankStoredFromFields(multiblockData, fissionReactorMultiblockDataClass, "fuelTank", "fuel");
+        if (viaTankField != null) {
+            return viaTankField;
+        }
+
+        return resolveNumericField(multiblockData, fissionReactorMultiblockDataClass,
+            "fuel", "currentFuel", "heatedFuel");
+    }
     
     private void collectFissionMetrics(Object multiblockData, String dimensionName, BlockPos labelPos) {
         int x = labelPos.getX();
@@ -1033,12 +1266,28 @@ public class MekanismMetrics {
             LOGGER.warn("✗ Could not determine coolant capacity for fission reactor {}", formatBlockPos(labelPos));
         }
 
+        Double coolantStored = resolveFissionCoolantStored(multiblockData);
+        if (coolantStored != null) {
+            fissionReactorCoolantStoredGauge.labels(labels).set(coolantStored);
+            LOGGER.debug("  Coolant stored: {} mB", coolantStored);
+        } else {
+            LOGGER.debug("  Coolant stored amount unavailable for fission reactor {}", formatBlockPos(labelPos));
+        }
+
         Double fuelCapacity = resolveFissionFuelCapacity(multiblockData);
         if (fuelCapacity != null) {
             fissionReactorFuelCapacityGauge.labels(labels).set(fuelCapacity);
             LOGGER.debug("  Fuel capacity: {} mB", fuelCapacity);
         } else {
             LOGGER.warn("✗ Could not determine fuel capacity for fission reactor {}", formatBlockPos(labelPos));
+        }
+
+        Double fuelStored = resolveFissionFuelStored(multiblockData);
+        if (fuelStored != null) {
+            fissionReactorFuelStoredGauge.labels(labels).set(fuelStored);
+            LOGGER.debug("  Fuel stored: {} mB", fuelStored);
+        } else {
+            LOGGER.debug("  Fuel stored amount unavailable for fission reactor {}", formatBlockPos(labelPos));
         }
     }
 
@@ -1065,6 +1314,10 @@ public class MekanismMetrics {
             if (capacity != null) {
                 fusionReactorCoolantCapacityGauge.labels(labels).set(capacity);
             }
+            Double stored = extractTankStored(waterTank);
+            if (stored != null) {
+                fusionReactorCoolantStoredGauge.labels(labels).set(stored);
+            }
         } catch (Exception e) {
             LOGGER.trace("Failed to get fusion coolant capacity", e);
         }
@@ -1074,6 +1327,10 @@ public class MekanismMetrics {
             Double capacity = extractTankCapacity(deuteriumTank, getChemicalTankCapacityMethod);
             if (capacity != null) {
                 fusionReactorDeuteriumCapacityGauge.labels(labels).set(capacity);
+            }
+            Double stored = extractTankStored(deuteriumTank);
+            if (stored != null) {
+                fusionReactorDeuteriumStoredGauge.labels(labels).set(stored);
             }
         } catch (Exception e) {
             LOGGER.trace("Failed to get fusion deuterium capacity", e);
@@ -1085,6 +1342,10 @@ public class MekanismMetrics {
             if (capacity != null) {
                 fusionReactorTritiumCapacityGauge.labels(labels).set(capacity);
             }
+            Double stored = extractTankStored(tritiumTank);
+            if (stored != null) {
+                fusionReactorTritiumStoredGauge.labels(labels).set(stored);
+            }
         } catch (Exception e) {
             LOGGER.trace("Failed to get fusion tritium capacity", e);
         }
@@ -1094,6 +1355,10 @@ public class MekanismMetrics {
             Double capacity = extractTankCapacity(fuelTank, getChemicalTankCapacityMethod);
             if (capacity != null) {
                 fusionReactorFuelCapacityGauge.labels(labels).set(capacity);
+            }
+            Double stored = extractTankStored(fuelTank);
+            if (stored != null) {
+                fusionReactorFuelStoredGauge.labels(labels).set(stored);
             }
         } catch (Exception e) {
             LOGGER.trace("Failed to get fusion fuel capacity", e);
